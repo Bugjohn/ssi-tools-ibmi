@@ -23,13 +23,18 @@
 ------------------------------------------------------------------------------
 
 SELECT
-    JOB_NAME,
-    USER_NAME,
-    COMMAND_TO_RUN
+    SCHEDULED_JOB_NAME                      AS JOB_NAME,
+    STATUS,
+    USER_PROFILE_FOR_SUBMITTED_JOB         AS RUN_AS_USER,
+    SCHEDULED_BY,
+    JOB_QUEUE_LIBRARY_NAME                 AS JOBQ_LIB,
+    JOB_QUEUE_NAME                         AS JOBQ,
+    NEXT_SUBMISSION_DATE,
+    LAST_SUCCESSFUL_SUBMISSION_TIMESTAMP,
+    COMMAND_STRING
 FROM QSYS2.SCHEDULED_JOB_INFO
-WHERE UPPER(COMMAND_TO_RUN) LIKE '%FTP%'
-ORDER BY JOB_NAME;
-
+WHERE UPPER(COMMAND_STRING) LIKE '%FTP%'
+ORDER BY SCHEDULED_JOB_NAME;
 ------------------------------------------------------------------------------
 -- SECTION 2
 -- Jobs actifs FTP

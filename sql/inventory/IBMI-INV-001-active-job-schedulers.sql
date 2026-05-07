@@ -49,15 +49,17 @@
 ------------------------------------------------------------------------------
 
 SELECT
-    JOB_NAME,
-    JOB_DESCRIPTION_LIBRARY,
-    JOB_DESCRIPTION,
-    SCHEDULE_DATE,
-    SCHEDULE_TIME,
-    USER_NAME,
-    COMMAND_TO_RUN
+    SCHEDULED_JOB_NAME                  AS JOB_NAME,
+    JOB_DESCRIPTION_LIBRARY_NAME       AS JOBD_LIB,
+    JOB_DESCRIPTION_NAME               AS JOBD,
+    SCHEDULED_DATE,
+    SCHEDULED_TIME,
+    USER_PROFILE_FOR_SUBMITTED_JOB     AS RUN_AS_USER,
+    SCHEDULED_BY,
+    STATUS,
+    COMMAND_STRING
 FROM QSYS2.SCHEDULED_JOB_INFO
-ORDER BY SCHEDULE_DATE, SCHEDULE_TIME;
+ORDER BY SCHEDULED_DATE, SCHEDULED_TIME;
 
 ------------------------------------------------------------------------------
 -- SECTION 2
@@ -74,16 +76,21 @@ ORDER BY SCHEDULE_DATE, SCHEDULE_TIME;
 ------------------------------------------------------------------------------
 
 SELECT
-    JOB_NAME,
-    USER_NAME,
-    COMMAND_TO_RUN
+    SCHEDULED_JOB_NAME          AS JOB_NAME,
+    SCHEDULED_BY,
+    USER_PROFILE_FOR_SUBMITTED_JOB AS RUN_AS_USER,
+    STATUS,
+    JOB_QUEUE_LIBRARY_NAME      AS JOBQ_LIB,
+    JOB_QUEUE_NAME              AS JOBQ,
+    NEXT_SUBMISSION_DATE,
+    LAST_SUCCESSFUL_SUBMISSION_TIMESTAMP,
+    COMMAND_STRING
 FROM QSYS2.SCHEDULED_JOB_INFO
-WHERE UPPER(COMMAND_TO_RUN) LIKE '%FTP%'
-   OR UPPER(COMMAND_TO_RUN) LIKE '%QSH%'
-   OR UPPER(COMMAND_TO_RUN) LIKE '%STRQSH%'
-   OR UPPER(COMMAND_TO_RUN) LIKE '%SFTP%'
-ORDER BY JOB_NAME;
-
+WHERE UPPER(COMMAND_STRING) LIKE '%FTP%'
+   OR UPPER(COMMAND_STRING) LIKE '%QSH%'
+   OR UPPER(COMMAND_STRING) LIKE '%STRQSH%'
+   OR UPPER(COMMAND_STRING) LIKE '%SFTP%'
+ORDER BY SCHEDULED_JOB_NAME;
 ------------------------------------------------------------------------------
 -- SECTION 3
 -- Risques SSI
@@ -105,4 +112,15 @@ ORDER BY JOB_NAME;
 -- - mais si on le coupe :
 --   production KO 😅
 --
+--
+-- DEBUG
+-- Il se peut que sur votre machine le nom des colonnes diffèrent ou sont absentes
+-- dans ce cas, il suffit de lancer :
+SELECT COLUMN_NAME
+FROM QSYS2.SYSCOLUMNS
+WHERE TABLE_SCHEMA = 'QSYS2'
+  AND TABLE_NAME = 'SCHEDULED_JOB_INFO'
+ORDER BY ORDINAL_POSITION;
+--
+--Puis adapter votre requête
 ------------------------------------------------------------------------------
