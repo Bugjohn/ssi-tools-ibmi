@@ -40,41 +40,82 @@
 ------------------------------------------------------------------------------
 
 SELECT
-    SERVER_NAME,
-    SERVER_STATUS,
-    PORT_NUMBER,
-    SECURE_CONNECTION,
-    LOCAL_ADDRESS
-FROM QSYS2.NETSTAT_SERVER_INFO
-WHERE UPPER(SERVER_NAME) LIKE '%HTTP%'
-   OR UPPER(SERVER_NAME) LIKE '%HTTPS%'
-ORDER BY PORT_NUMBER;
+    LOCAL_ADDRESS,
+    LOCAL_PORT,
+    LOCAL_PORT_NAME,
+    PROTOCOL,
+    TCP_STATE,
+    CONNECTION_OPEN_TYPE,
+    BIND_USER,
+    NUMBER_OF_ASSOCIATED_JOBS,
+    CONNECTION_TRANSPORT_LAYER,
+
+    CASE
+        WHEN LOCAL_PORT IN (80, 2001, 2010)
+            THEN 'HTTP NON CHIFFRE'
+        WHEN LOCAL_PORT IN (443, 2002, 2011)
+            THEN 'HTTPS / SECURISE A VERIFIER'
+        ELSE 'AUTRE'
+    END AS SECURITY_STATUS,
+
+    CASE
+        WHEN LOCAL_ADDRESS = '0.0.0.0'
+            THEN 'EXPOSE SUR TOUTES LES INTERFACES'
+        ELSE 'LIE A UNE IP SPECIFIQUE'
+    END AS EXPOSURE_LEVEL
+
+FROM QSYS2.NETSTAT_INFO
+
+WHERE PROTOCOL = 'TCP'
+AND LOCAL_PORT IN (
+    80,     -- HTTP
+    443,    -- HTTPS
+    2001,   -- IBM i Admin HTTP
+    2002,   -- IBM i Admin HTTPS
+    2010,
+    2011
+)
+
+ORDER BY LOCAL_PORT, LOCAL_ADDRESS;
 
 ------------------------------------------------------------------------------
 -- SECTION 2
--- Vérification exposition HTTP non sécurisé
-------------------------------------------------------------------------------
---
--- HTTP non sécurisé :
---
--- - authentification potentiellement en clair
--- - cookies non protégés
--- - administration exposée
---
-------------------------------------------------------------------------------
+/* =========================================================
+   AUDIT HTTP / ADMIN IBM i
+   Objectif :
+   - détecter les services HTTP/admin exposés
+   - identifier les ports non chiffrés
+   - préparer le passage niveau 40
+   ========================================================= */
 
 SELECT
-    SERVER_NAME,
-    PORT_NUMBER,
-    SERVER_STATUS
-FROM QSYS2.NETSTAT_SERVER_INFO
-WHERE (
-        UPPER(SERVER_NAME) LIKE '%HTTP%'
-     OR UPPER(SERVER_NAME) LIKE '%ADMIN%'
-)
-AND SECURE_CONNECTION = 'NO'
-ORDER BY PORT_NUMBER;
+    LOCAL_ADDRESS,
+    LOCAL_PORT,
+    LOCAL_PORT_NAME,
+    TCP_STATE,
+    BIND_USER,
+    NUMBER_OF_ASSOCIATED_JOBS,
 
+    CASE
+        WHEN LOCAL_PORT IN (80, 2001, 2010)
+            THEN 'CRITIQUE - HTTP NON CHIFFRE'
+        WHEN LOCAL_PORT IN (443, 2002, 2011)
+            THEN 'HTTPS / ADMIN SECURISE A VERIFIER'
+        ELSE 'INCONNU'
+    END AS SSI_STATUS,
+
+    CASE
+        WHEN LOCAL_ADDRESS = '0.0.0.0'
+            THEN 'EXPOSE SUR TOUTES LES INTERFACES'
+        ELSE 'LIE A UNE IP SPECIFIQUE'
+    END AS EXPOSURE_LEVEL
+
+FROM QSYS2.NETSTAT_INFO
+
+WHERE PROTOCOL = 'TCP'
+  AND LOCAL_PORT IN (80, 443, 2001, 2002, 2010, 2011)
+
+ORDER BY LOCAL_PORT, LOCAL_ADDRESS;
 ------------------------------------------------------------------------------
 -- SECTION 3
 -- Risques SSI

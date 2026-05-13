@@ -178,27 +178,21 @@ ORDER BY ORDINAL_POSITION;
 -- ============================================================================
 
 SELECT
-    SYSTEM_OBJECT_SCHEMA            AS OBJECT_LIBRARY,
-    SYSTEM_OBJECT_NAME              AS OBJECT_NAME,
-    OBJECT_TYPE                     AS OBJECT_TYPE,
-
-    OWNER                           AS OWNER,
-    PRIMARY_GROUP                   AS PRIMARY_GROUP,
-
-    AUTHORIZATION_LIST              AS AUTHORIZATION_LIST,
-
-    AUTHORIZATION_NAME              AS AUTHORIZATION_NAME,
-    OBJECT_AUTHORITY                AS OBJECT_AUTHORITY,
-
-    TEXT_DESCRIPTION                AS TEXT_DESCRIPTION,
+    SYSTEM_OBJECT_SCHEMA AS OBJECT_LIBRARY,
+    SYSTEM_OBJECT_NAME AS OBJECT_NAME,
+    OBJECT_TYPE,
+    OWNER,
+    PRIMARY_GROUP,
+    AUTHORIZATION_LIST,
+    AUTHORIZATION_NAME,
+    OBJECT_AUTHORITY,
+    TEXT_DESCRIPTION,
 
     CASE
-        WHEN OBJECT_TYPE IN ('*PGM', '*SRVPGM')
-            THEN 'HIGH'
-        WHEN OBJECT_TYPE IN ('*FILE', '*DTAARA')
-            THEN 'MEDIUM'
+        WHEN OBJECT_TYPE IN ('*PGM', '*SRVPGM') THEN 'HIGH'
+        WHEN OBJECT_TYPE IN ('*FILE', '*DTAARA') THEN 'MEDIUM'
         ELSE 'LOW'
-    END                             AS SEVERITY,
+    END AS SEVERITY,
 
     CASE
         WHEN OBJECT_TYPE IN ('*PGM', '*SRVPGM')
@@ -206,20 +200,19 @@ SELECT
         WHEN OBJECT_TYPE IN ('*FILE', '*DTAARA')
             THEN 'Objet de données sans *AUTL : vérifier cohérence des accès.'
         ELSE
-            THEN 'Objet sans *AUTL : qualification recommandée.'
-    END                             AS SSI_COMMENT
+            'Objet sans *AUTL : qualification recommandée.'
+    END AS SSI_COMMENT
 
 FROM QSYS2.OBJECT_PRIVILEGES
 
-WHERE AUTHORIZATION_LIST = ''
+WHERE COALESCE(NULLIF(TRIM(AUTHORIZATION_LIST), ''), '*NONE') IN ('*NONE', '-')
   AND OBJECT_TYPE IN (
-        '*FILE',
-        '*PGM',
-        '*SRVPGM',
-        '*CMD',
-        '*DTAARA'
-      )
-
+      '*FILE',
+      '*PGM',
+      '*SRVPGM',
+      '*CMD',
+      '*DTAARA'
+  )
   AND SYSTEM_OBJECT_SCHEMA NOT LIKE 'Q%'
 
 ORDER BY

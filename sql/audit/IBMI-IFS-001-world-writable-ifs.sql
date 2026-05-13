@@ -190,47 +190,102 @@ FETCH FIRST 10 ROWS ONLY;
 --   - réduire progressivement les expositions.
 -- ============================================================================
 
+/* ============================================================
+   AUDIT SSI - IFS POTENTIELLEMENT DANGEREUX
+   ------------------------------------------------------------
+   OBJECTIF :
+   - Identifier fichiers/répertoires IFS sensibles
+   - Détecter absence d'AUTL
+   - Détecter objets non journalisés
+   - Identifier fichiers SSH / temporaires / cachés
+   - Préparer forensic / PRA / niveau 40
+
+   TYPE :
+   SAFE / LECTURE SEULE
+   ============================================================ */
+
 SELECT
-    PATH_NAME                      AS IFS_PATH,
-    OBJECT_TYPE                    AS OBJECT_TYPE,
 
-    OWNER                          AS OWNER,
-    GROUP_OWNER                    AS GROUP_OWNER,
+    PATH_NAME                         AS IFS_PATH,
+    OBJECT_TYPE,
+    OBJECT_OWNER,
+    PRIMARY_GROUP,
 
-    DATA_SIZE                      AS DATA_SIZE,
+    DATA_SIZE,
 
-    PERMISSION_BITS                AS PERMISSION_BITS,
+    AUTHORIZATION_LIST,
 
-    LAST_MODIFIED_TIMESTAMP        AS LAST_MODIFIED,
+    OBJECT_AUDIT,
+    JOURNALED,
+
+    OBJECT_SIGNED,
+    SYSTEM_TRUSTED_SOURCE,
+
+    OBJECT_HIDDEN,
+    TEMPORARY_OBJECT,
+
+    CREATE_TIMESTAMP,
+    DATA_CHANGE_TIMESTAMP,
+    LAST_USED_TIMESTAMP,
 
     CASE
-        WHEN PERMISSION_BITS LIKE '%777%'
+
+        WHEN PATH_NAME LIKE '/home/%/.ssh/%'
             THEN 'CRITICAL'
-        WHEN PERMISSION_BITS LIKE '%776%'
+
+        WHEN PATH_NAME LIKE '/tmp/%'
+          OR PATH_NAME LIKE '/QOpenSys/tmp/%'
             THEN 'HIGH'
-        WHEN PERMISSION_BITS LIKE '%775%'
+
+        WHEN AUTHORIZATION_LIST IS NULL
+          OR AUTHORIZATION_LIST = ''
             THEN 'MEDIUM'
+
+        WHEN JOURNALED = 'NO'
+            THEN 'MEDIUM'
+
         ELSE 'LOW'
-    END                             AS SEVERITY,
+
+    END AS SEVERITY,
 
     CASE
-        WHEN PERMISSION_BITS LIKE '%777%'
-            THEN 'IFS ouvert en écriture complète : vérifier immédiatement.'
-        WHEN PERMISSION_BITS LIKE '%776%'
-            THEN 'IFS très permissif : qualification SSI recommandée.'
+
+        WHEN PATH_NAME LIKE '/home/%/.ssh/%'
+            THEN 'Présence de clés/fichiers SSH utilisateur : vérifier permissions et usages.'
+
+        WHEN PATH_NAME LIKE '/tmp/%'
+          OR PATH_NAME LIKE '/QOpenSys/tmp/%'
+            THEN 'Répertoire temporaire : risque dépôt scripts/binaires.'
+
+        WHEN AUTHORIZATION_LIST IS NULL
+          OR AUTHORIZATION_LIST = ''
+            THEN 'Objet IFS sans gouvernance *AUTL.'
+
+        WHEN JOURNALED = 'NO'
+            THEN 'Objet IFS non journalisé : visibilité forensic réduite.'
+
         ELSE
-            'Permissions à analyser selon contexte applicatif.'
-    END                             AS SSI_COMMENT
+            'Objet IFS à qualifier selon contexte applicatif.'
+
+    END AS SSI_COMMENT
 
 FROM TABLE(
+
     QSYS2.IFS_OBJECT_STATISTICS(
-        START_PATH_NAME => '/',
+        START_PATH_NAME => '/home',
         SUBTREE_DIRECTORIES => 'YES'
     )
+
 ) AS IFSOBJ
 
 WHERE
-    PERMISSION_BITS LIKE '%77%'
+
+       PATH_NAME LIKE '/home/%/.ssh/%'
+    OR PATH_NAME LIKE '/tmp/%'
+    OR PATH_NAME LIKE '/QOpenSys/tmp/%'
+    OR AUTHORIZATION_LIST IS NULL
+    OR AUTHORIZATION_LIST = ''
+    OR JOURNALED = 'NO'
 
 ORDER BY
     SEVERITY,

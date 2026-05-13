@@ -39,18 +39,55 @@
 -- Services DB2 exposés
 ------------------------------------------------------------------------------
 
+/* =========================================================
+   AUDIT DRDA / DDM / ODBC IBM i
+   Compatible systèmes sans NETSTAT_SERVER_INFO
+   Basé sur QSYS2.NETSTAT_INFO
+   ========================================================= */
+
 SELECT
-    SERVER_NAME,
-    PORT_NUMBER,
-    SERVER_STATUS,
-    SECURE_CONNECTION
-FROM QSYS2.NETSTAT_SERVER_INFO
-WHERE UPPER(SERVER_NAME) IN (
-    'DRDA',
-    'DDM',
-    'ODBC'
+    LOCAL_ADDRESS,
+    LOCAL_PORT,
+    LOCAL_PORT_NAME,
+    PROTOCOL,
+    TCP_STATE,
+    CONNECTION_OPEN_TYPE,
+    BIND_USER,
+    NUMBER_OF_ASSOCIATED_JOBS,
+    CONNECTION_TRANSPORT_LAYER,
+
+    CASE
+        WHEN LOCAL_PORT = 446
+            THEN 'DRDA / DDM SECURISE POTENTIEL'
+        WHEN LOCAL_PORT IN (8471, 8476)
+            THEN 'SERVICE IBM i DISTANT'
+        ELSE 'SERVICE SQL / ODBC A ANALYSER'
+    END AS SERVICE_TYPE,
+
+    CASE
+        WHEN LOCAL_ADDRESS = '0.0.0.0'
+            THEN 'EXPOSE SUR TOUTES LES INTERFACES'
+        ELSE 'LIE A UNE IP SPECIFIQUE'
+    END AS EXPOSURE_LEVEL,
+
+    CASE
+        WHEN TCP_STATE = 'TCPLISTEN'
+            THEN 'SERVICE EN ECOUTE'
+        ELSE 'CONNEXION ACTIVE'
+    END AS CONNECTION_STATUS
+
+FROM QSYS2.NETSTAT_INFO
+
+WHERE PROTOCOL = 'TCP'
+AND LOCAL_PORT IN (
+    446,   -- DRDA / DB2
+    447,   -- DDM
+    448,   -- AS-DATABASE
+    8471,  -- IBM i Remote Command
+    8476   -- IBM i Database Host Server
 )
-ORDER BY SERVER_NAME;
+
+ORDER BY LOCAL_PORT, LOCAL_ADDRESS;
 
 ------------------------------------------------------------------------------
 -- SECTION 2
@@ -73,16 +110,32 @@ ORDER BY SERVER_NAME;
 SELECT
     AUTHORIZATION_NAME,
     STATUS,
+    USER_CLASS_NAME,
+    LOCAL_PASSWORD_MANAGEMENT,
+    GROUP_PROFILE_NAME,
+    SUPPLEMENTAL_GROUP_LIST,
     SPECIAL_AUTHORITIES,
-    USER_CLASS,
-    LOCAL_PASSWORD_MANAGEMENT
+
+    CASE
+        WHEN SPECIAL_AUTHORITIES LIKE '%*ALLOBJ%'
+         AND SPECIAL_AUTHORITIES LIKE '%*SECADM%'
+            THEN 'CRITIQUE - ALLOBJ + SECADM'
+        WHEN SPECIAL_AUTHORITIES LIKE '%*ALLOBJ%'
+            THEN 'CRITIQUE - ALLOBJ'
+        WHEN SPECIAL_AUTHORITIES LIKE '%*SECADM%'
+            THEN 'ELEVE - SECADM'
+        ELSE 'A ANALYSER'
+    END AS SSI_STATUS
+
 FROM QSYS2.USER_INFO
 WHERE STATUS = '*ENABLED'
-AND (
-    SPECIAL_AUTHORITIES LIKE '%*ALLOBJ%'
-    OR SPECIAL_AUTHORITIES LIKE '%*SECADM%'
-)
-ORDER BY AUTHORIZATION_NAME;
+  AND (
+        SPECIAL_AUTHORITIES LIKE '%*ALLOBJ%'
+     OR SPECIAL_AUTHORITIES LIKE '%*SECADM%'
+      )
+ORDER BY
+    SSI_STATUS,
+    AUTHORIZATION_NAME;
 
 ------------------------------------------------------------------------------
 -- SECTION 3
